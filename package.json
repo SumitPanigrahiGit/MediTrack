@@ -4,8 +4,8 @@
   "description": "MediTrack Healthcare Management System",
   "scripts": {
     "start": "node backend/server.js",
-    "build": "cd frontend && npm install && CI=false npm run build && cd ..",
-    "postinstall": "cd frontend && npm install && cd .."
+    "build": "cd Frontend && npm install && CI=false npm run build && cd ..",
+    "postinstall": "cd Frontend && npm install && cd .."
   },
   "engines": {
     "node": ">=18.0.0"
