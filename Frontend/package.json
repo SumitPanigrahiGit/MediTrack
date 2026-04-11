@@ -15,10 +15,8 @@
     "@headlessui/react": "^1.7.17"
   },
   "scripts": {
-    "start": "react-scripts start",
-    "build": "react-scripts build",
-    "test": "react-scripts test",
-    "eject": "react-scripts eject"
+     "start": "HOST='0.0.0.0' PORT=3000 react-scripts start",
+    "build": "react-scripts build"
   },
   "eslintConfig": {
     "extends": ["react-app"]
