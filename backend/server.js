@@ -25,14 +25,7 @@ app.use('/api/', limiter);
 
 // ─── CORS ─────────────────────────────────────────────────────────
 app.use(cors({
-  origin: function(origin, callback) {
-    // Allow all origins in production
-    if (!origin || origin.includes('onrender.com') || origin.includes('localhost')) {
-      callback(null, true);
-    } else {
-      callback(null, true); // Allow all for now
-    }
-  },
+  origin: process.env.FRONTEND_URL || '*',
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
   allowedHeaders: ['Content-Type', 'Authorization']
@@ -41,46 +34,31 @@ app.use(cors({
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// ─── Serve Frontend Dashboard (IMPORTANT PART) ────────────────────
-// Look for frontend build in different possible locations
-let frontendBuildPath = null;
+// ─── Serve Frontend Dashboard (CRITICAL FOR RENDER) ───────────────
+// Look for frontend build (relative to root, not backend folder)
+const frontendBuildPath = path.join(__dirname, '..', 'frontend', 'build');
 
-if (fs.existsSync(path.join(__dirname, 'build'))) {
-  frontendBuildPath = path.join(__dirname, 'build');
-  console.log('✅ Found frontend build at: /build');
-} else if (fs.existsSync(path.join(__dirname, 'frontend', 'build'))) {
-  frontendBuildPath = path.join(__dirname, 'frontend', 'build');
-  console.log('✅ Found frontend build at: /frontend/build');
-} else if (fs.existsSync(path.join(__dirname, 'dist'))) {
-  frontendBuildPath = path.join(__dirname, 'dist');
-  console.log('✅ Found frontend build at: /dist');
-} else if (fs.existsSync(path.join(__dirname, 'frontend', 'dist'))) {
-  frontendBuildPath = path.join(__dirname, 'frontend', 'dist');
-  console.log('✅ Found frontend build at: /frontend/dist');
-}
-
-// Serve static files if frontend build exists
-if (frontendBuildPath) {
-  // Serve static assets
+if (fs.existsSync(frontendBuildPath)) {
+  console.log('✅ Serving frontend dashboard from:', frontendBuildPath);
+  
+  // Serve static files
   app.use(express.static(frontendBuildPath));
   
-  // IMPORTANT: For React Router - handle all non-API routes
+  // IMPORTANT: Handle React Router - all non-API routes go to index.html
   app.get('*', (req, res, next) => {
     // Skip API routes
     if (req.path.startsWith('/api/')) {
       return next();
     }
-    // Serve index.html for all other routes
+    // Serve index.html for all other routes (React Router)
     res.sendFile(path.join(frontendBuildPath, 'index.html'));
   });
-  
-  console.log(`🎨 Frontend dashboard will be served from: ${frontendBuildPath}`);
 } else {
-  console.log('⚠️  No frontend build found. Dashboard will not be visible.');
-  console.log('   Make sure to build your frontend before deploying.');
+  console.log('⚠️ Frontend build not found at:', frontendBuildPath);
+  console.log('   Build frontend with: cd frontend && npm run build');
 }
 
-// ─── In-Memory Data Store (your existing data) ────────────────────
+// ─── In-Memory Data Store ─────────────────────────────────────────
 global.db = {
   users: [
     {
@@ -97,7 +75,7 @@ global.db = {
       available: true,
       slots: ['09:00', '10:00', '11:00', '14:00', '15:00', '16:00'],
       availableDays: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'],
-      bio: 'Expert cardiologist with 12 years of experience. Specializes in preventive cardiology and heart disease management.',
+      bio: 'Expert cardiologist with 12 years of experience.',
       approved: true,
       avatar: null
     },
@@ -115,7 +93,7 @@ global.db = {
       available: true,
       slots: ['10:00', '11:00', '12:00', '15:00', '16:00'],
       availableDays: ['Monday', 'Wednesday', 'Friday'],
-      bio: 'Neurologist specializing in epilepsy, migraines, and stroke management.',
+      bio: 'Neurologist specializing in epilepsy and migraines.',
       approved: true,
       avatar: null
     },
@@ -133,7 +111,7 @@ global.db = {
       available: true,
       slots: ['09:00', '10:00', '14:00', '15:00', '16:00', '17:00'],
       availableDays: ['Tuesday', 'Thursday', 'Saturday'],
-      bio: 'Dermatologist with expertise in cosmetic and medical dermatology.',
+      bio: 'Dermatologist with expertise in cosmetic dermatology.',
       approved: true,
       avatar: null
     },
@@ -208,7 +186,7 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/prescriptions', prescriptionRoutes);
 
-// ─── Health Check API ─────────────────────────────────────────────
+// ─── Health Check ─────────────────────────────────────────────────
 app.get('/api/health', (req, res) => {
   res.json({
     success: true,
@@ -224,16 +202,7 @@ app.get('/api', (req, res) => {
     success: true,
     message: '🏥 MediTrack API is running',
     version: '1.0.0',
-    timestamp: new Date().toISOString(),
-    endpoints: {
-      auth: '/api/auth',
-      doctors: '/api/doctors',
-      appointments: '/api/appointments',
-      ai: '/api/ai',
-      admin: '/api/admin',
-      payments: '/api/payments',
-      prescriptions: '/api/prescriptions'
-    }
+    timestamp: new Date().toISOString()
   });
 });
 
@@ -255,7 +224,7 @@ app.use((err, req, res, next) => {
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`\n🏥 MediTrack Backend running on http://localhost:${PORT}`);
   console.log(`📋 API available at http://localhost:${PORT}/api`);
-  if (frontendBuildPath) {
+  if (fs.existsSync(frontendBuildPath)) {
     console.log(`🎨 Frontend Dashboard available at http://localhost:${PORT}`);
   }
   console.log(`\n`);
