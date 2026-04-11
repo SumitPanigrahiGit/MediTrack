@@ -3,8 +3,11 @@
   "version": "1.0.0",
   "description": "MediTrack Healthcare Management System",
   "scripts": {
-    "start": "node backend/server.js",
-    "build": "cd Frontend && npm install && CI=false npm run build && cd .."
+   "start": "react-scripts start",
+    "build": "react-scripts build",
+    "test": "react-scripts test",
+    "eject": "react-scripts eject"
+  }
   },
   "engines": {
     "node": ">=18.0.0"
