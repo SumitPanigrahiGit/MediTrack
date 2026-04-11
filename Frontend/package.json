@@ -1,12 +1,17 @@
 {
   "name": "meditrack-fullstack",
   "version": "1.0.0",
+   "homepage": ".",
+  "private": true,
+
   "description": "MediTrack Healthcare Platform",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
     "build": "echo 'Build skipped - using pre-built frontend'"
   },
+
+  
   "dependencies": {
     "express": "^4.18.2",
     "cors": "^2.8.5",
