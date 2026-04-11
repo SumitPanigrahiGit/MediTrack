@@ -3,13 +3,16 @@ const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
 const rateLimit = require('express-rate-limit');
+const path = require('path');
 require('dotenv').config();
 
 const app = express();
 const PORT = process.env.PORT || 5000;
 
 // ─── Security Middleware ──────────────────────────────────────────
-app.use(helmet());
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: "cross-origin" }
+}));
 app.use(morgan('dev'));
 
 const limiter = rateLimit({
@@ -20,8 +23,21 @@ const limiter = rateLimit({
 app.use('/api/', limiter);
 
 // ─── CORS ─────────────────────────────────────────────────────────
+// Allow both frontend URL and same-origin
+const allowedOrigins = [
+  process.env.FRONTEND_URL,
+  `http://localhost:${PORT}`,
+  `https://${process.env.RENDER_EXTERNAL_HOSTNAME}`
+].filter(Boolean);
+
 app.use(cors({
-  origin: process.env.FRONTEND_URL || '*',
+  origin: function(origin, callback) {
+    if (!origin || allowedOrigins.includes(origin) || origin.includes('onrender.com')) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
   allowedHeaders: ['Content-Type', 'Authorization']
@@ -30,15 +46,42 @@ app.use(cors({
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// ─── In-Memory Data Store (no DB needed for prototype) ────────────
-// In production, replace with MongoDB
+// ─── Serve Static Frontend Files (AFTER API routes) ───────────────
+// Check if frontend build exists
+const frontendPath = path.join(__dirname, 'frontend', 'build');
+const staticPath = path.join(__dirname, 'build');
+
+let staticDir = null;
+if (require('fs').existsSync(frontendPath)) {
+  staticDir = frontendPath;
+  console.log('📁 Serving frontend from: frontend/build');
+} else if (require('fs').existsSync(staticPath)) {
+  staticDir = staticPath;
+  console.log('📁 Serving frontend from: build');
+}
+
+if (staticDir) {
+  // Serve static files
+  app.use(express.static(staticDir));
+  
+  // For React Router - serve index.html for all non-API routes
+  app.get('*', (req, res, next) => {
+    // Skip API routes
+    if (req.path.startsWith('/api/') || req.path === '/api/health') {
+      return next();
+    }
+    res.sendFile(path.join(staticDir, 'index.html'));
+  });
+}
+
+// ─── In-Memory Data Store (your existing data) ────────────────────
 global.db = {
   users: [
     {
       id: 'u1',
       name: 'Dr. Aisha Sharma',
       email: 'doctor@meditrack.com',
-      password: '$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', // password
+      password: '$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi',
       role: 'doctor',
       specialisation: 'Cardiology',
       location: 'Mumbai',
@@ -160,7 +203,17 @@ app.use('/api/payments', paymentRoutes);
 app.use('/api/prescriptions', prescriptionRoutes);
 
 // ─── Health Check ─────────────────────────────────────────────────
-app.get('/', (req, res) => {
+app.get('/api/health', (req, res) => {
+  res.json({
+    success: true,
+    status: 'healthy',
+    uptime: process.uptime(),
+    timestamp: new Date().toISOString()
+  });
+});
+
+// ─── Root Route ───────────────────────────────────────────────────
+app.get('/api', (req, res) => {
   res.json({
     success: true,
     message: '🏥 MediTrack API is running',
@@ -178,18 +231,9 @@ app.get('/', (req, res) => {
   });
 });
 
-app.get('/api/health', (req, res) => {
-  res.json({
-    success: true,
-    status: 'healthy',
-    uptime: process.uptime(),
-    timestamp: new Date().toISOString()
-  });
-});
-
-// ─── 404 Handler ──────────────────────────────────────────────────
-app.use('*', (req, res) => {
-  res.status(404).json({ success: false, message: `Route ${req.originalUrl} not found` });
+// ─── 404 Handler for API routes ──────────────────────────────────
+app.use('/api/*', (req, res) => {
+  res.status(404).json({ success: false, message: `API route ${req.originalUrl} not found` });
 });
 
 // ─── Error Handler ────────────────────────────────────────────────
@@ -201,9 +245,16 @@ app.use((err, req, res, next) => {
   });
 });
 
-app.listen(PORT, () => {
+// ─── Start Server ─────────────────────────────────────────────────
+app.listen(PORT, '0.0.0.0', () => {
   console.log(`\n🏥 MediTrack Backend running on http://localhost:${PORT}`);
-  console.log(`📋 API Docs available at http://localhost:${PORT}/\n`);
+  console.log(`📋 API available at http://localhost:${PORT}/api`);
+  if (staticDir) {
+    console.log(`🎨 Frontend dashboard available at http://localhost:${PORT}`);
+  } else {
+    console.log(`⚠️  No frontend build found. Build your frontend first.`);
+  }
+  console.log(`\n`);
 });
 
 module.exports = app;
