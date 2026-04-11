@@ -38,6 +38,7 @@ const ProtectedRoute = ({ children, roles }) => {
   return children;
 };
 
+axios.post('/api/auth/login', data)
 const DashboardRouter = () => {
   const { user } = useAuth();
   if (!user) return <Navigate to="/login" replace />;
