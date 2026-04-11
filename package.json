@@ -1,13 +1,12 @@
 {
-  "name": "meditrack-backend",
+  "name": "meditrack-fullstack",
   "version": "1.0.0",
-  "description": "MediTrack Healthcare Platform Backend",
+  "description": "MediTrack Healthcare Platform",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "nodemon server.js",
-    "build": "echo 'No build step needed for backend'",
-    "postinstall": "echo 'Backend dependencies installed'"
+    "build": "bash render-build.sh",
+    "dev": "nodemon server.js"
   },
   "dependencies": {
     "express": "^4.18.2",
