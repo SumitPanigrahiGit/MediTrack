@@ -23,6 +23,14 @@ const limiter = rateLimit({
 });
 app.use('/api/', limiter);
 
+const path = require('path');
+const fs = require('fs');
+
+// Look for frontend build (adjust case as needed)
+const frontendBuildPath = path.join(__dirname, '..', 'Frontend', 'build');
+// OR if lowercase:
+// const frontendBuildPath = path.join(__dirname, '..', 'frontend', 'build');
+
 // ─── CORS ─────────────────────────────────────────────────────────
 app.use(cors({
   origin: process.env.FRONTEND_URL || '*',
