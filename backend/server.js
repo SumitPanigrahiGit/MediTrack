@@ -4,6 +4,7 @@ const helmet = require('helmet');
 const morgan = require('morgan');
 const rateLimit = require('express-rate-limit');
 const path = require('path');
+const fs = require('fs');
 require('dotenv').config();
 
 const app = express();
@@ -23,19 +24,13 @@ const limiter = rateLimit({
 app.use('/api/', limiter);
 
 // ─── CORS ─────────────────────────────────────────────────────────
-// Allow both frontend URL and same-origin
-const allowedOrigins = [
-  process.env.FRONTEND_URL,
-  `http://localhost:${PORT}`,
-  `https://${process.env.RENDER_EXTERNAL_HOSTNAME}`
-].filter(Boolean);
-
 app.use(cors({
   origin: function(origin, callback) {
-    if (!origin || allowedOrigins.includes(origin) || origin.includes('onrender.com')) {
+    // Allow all origins in production
+    if (!origin || origin.includes('onrender.com') || origin.includes('localhost')) {
       callback(null, true);
     } else {
-      callback(new Error('Not allowed by CORS'));
+      callback(null, true); // Allow all for now
     }
   },
   credentials: true,
@@ -46,32 +41,43 @@ app.use(cors({
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// ─── Serve Static Frontend Files (AFTER API routes) ───────────────
-// Check if frontend build exists
-const frontendPath = path.join(__dirname, 'frontend', 'build');
-const staticPath = path.join(__dirname, 'build');
+// ─── Serve Frontend Dashboard (IMPORTANT PART) ────────────────────
+// Look for frontend build in different possible locations
+let frontendBuildPath = null;
 
-let staticDir = null;
-if (require('fs').existsSync(frontendPath)) {
-  staticDir = frontendPath;
-  console.log('📁 Serving frontend from: frontend/build');
-} else if (require('fs').existsSync(staticPath)) {
-  staticDir = staticPath;
-  console.log('📁 Serving frontend from: build');
+if (fs.existsSync(path.join(__dirname, 'build'))) {
+  frontendBuildPath = path.join(__dirname, 'build');
+  console.log('✅ Found frontend build at: /build');
+} else if (fs.existsSync(path.join(__dirname, 'frontend', 'build'))) {
+  frontendBuildPath = path.join(__dirname, 'frontend', 'build');
+  console.log('✅ Found frontend build at: /frontend/build');
+} else if (fs.existsSync(path.join(__dirname, 'dist'))) {
+  frontendBuildPath = path.join(__dirname, 'dist');
+  console.log('✅ Found frontend build at: /dist');
+} else if (fs.existsSync(path.join(__dirname, 'frontend', 'dist'))) {
+  frontendBuildPath = path.join(__dirname, 'frontend', 'dist');
+  console.log('✅ Found frontend build at: /frontend/dist');
 }
 
-if (staticDir) {
-  // Serve static files
-  app.use(express.static(staticDir));
+// Serve static files if frontend build exists
+if (frontendBuildPath) {
+  // Serve static assets
+  app.use(express.static(frontendBuildPath));
   
-  // For React Router - serve index.html for all non-API routes
+  // IMPORTANT: For React Router - handle all non-API routes
   app.get('*', (req, res, next) => {
     // Skip API routes
-    if (req.path.startsWith('/api/') || req.path === '/api/health') {
+    if (req.path.startsWith('/api/')) {
       return next();
     }
-    res.sendFile(path.join(staticDir, 'index.html'));
+    // Serve index.html for all other routes
+    res.sendFile(path.join(frontendBuildPath, 'index.html'));
   });
+  
+  console.log(`🎨 Frontend dashboard will be served from: ${frontendBuildPath}`);
+} else {
+  console.log('⚠️  No frontend build found. Dashboard will not be visible.');
+  console.log('   Make sure to build your frontend before deploying.');
 }
 
 // ─── In-Memory Data Store (your existing data) ────────────────────
@@ -202,7 +208,7 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/prescriptions', prescriptionRoutes);
 
-// ─── Health Check ─────────────────────────────────────────────────
+// ─── Health Check API ─────────────────────────────────────────────
 app.get('/api/health', (req, res) => {
   res.json({
     success: true,
@@ -212,7 +218,7 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-// ─── Root Route ───────────────────────────────────────────────────
+// ─── API Root ─────────────────────────────────────────────────────
 app.get('/api', (req, res) => {
   res.json({
     success: true,
@@ -249,10 +255,8 @@ app.use((err, req, res, next) => {
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`\n🏥 MediTrack Backend running on http://localhost:${PORT}`);
   console.log(`📋 API available at http://localhost:${PORT}/api`);
-  if (staticDir) {
-    console.log(`🎨 Frontend dashboard available at http://localhost:${PORT}`);
-  } else {
-    console.log(`⚠️  No frontend build found. Build your frontend first.`);
+  if (frontendBuildPath) {
+    console.log(`🎨 Frontend Dashboard available at http://localhost:${PORT}`);
   }
   console.log(`\n`);
 });
