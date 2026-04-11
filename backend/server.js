@@ -23,14 +23,6 @@ const limiter = rateLimit({
 });
 app.use('/api/', limiter);
 
-const path = require('path');
-const fs = require('fs');
-
-// Look for frontend build (adjust case as needed)
-const frontendBuildPath = path.join(__dirname, '..', 'Frontend', 'build');
-// OR if lowercase:
-// const frontendBuildPath = path.join(__dirname, '..', 'frontend', 'build');
-
 // ─── CORS ─────────────────────────────────────────────────────────
 app.use(cors({
   origin: process.env.FRONTEND_URL || '*',
@@ -43,10 +35,26 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // ─── Serve Frontend Dashboard (CRITICAL FOR RENDER) ───────────────
-// Look for frontend build (relative to root, not backend folder)
-const frontendBuildPath = path.join(__dirname, '..', 'frontend', 'build');
+// Look for frontend build in different possible locations (declare ONLY ONCE)
+let frontendBuildPath = null;
 
-if (fs.existsSync(frontendBuildPath)) {
+// Check possible locations (adjust case as needed - your folder is 'Frontend' with capital F)
+const possiblePaths = [
+  path.join(__dirname, '..', 'Frontend', 'build'),  // Capital F
+  path.join(__dirname, '..', 'frontend', 'build'),  // lowercase
+  path.join(__dirname, '..', 'build'),              // root build
+  path.join(__dirname, 'Frontend', 'build'),        // backend/Frontend/build
+  path.join(__dirname, 'frontend', 'build')         // backend/frontend/build
+];
+
+for (const p of possiblePaths) {
+  if (fs.existsSync(p)) {
+    frontendBuildPath = p;
+    break;
+  }
+}
+
+if (frontendBuildPath) {
   console.log('✅ Serving frontend dashboard from:', frontendBuildPath);
   
   // Serve static files
@@ -62,8 +70,27 @@ if (fs.existsSync(frontendBuildPath)) {
     res.sendFile(path.join(frontendBuildPath, 'index.html'));
   });
 } else {
-  console.log('⚠️ Frontend build not found at:', frontendBuildPath);
-  console.log('   Build frontend with: cd frontend && npm run build');
+  console.log('⚠️ Frontend build not found. Checked paths:', possiblePaths);
+  console.log('   Make sure to build your frontend: cd Frontend && npm run build');
+  
+  // Fallback API message for root route when no frontend
+  app.get('/', (req, res) => {
+    res.json({
+      success: true,
+      message: '🏥 MediTrack API is running',
+      version: '1.0.0',
+      note: 'Frontend not built. Visit /api for API endpoints.',
+      endpoints: {
+        auth: '/api/auth',
+        doctors: '/api/doctors',
+        appointments: '/api/appointments',
+        ai: '/api/ai',
+        admin: '/api/admin',
+        payments: '/api/payments',
+        prescriptions: '/api/prescriptions'
+      }
+    });
+  });
 }
 
 // ─── In-Memory Data Store ─────────────────────────────────────────
@@ -232,8 +259,10 @@ app.use((err, req, res, next) => {
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`\n🏥 MediTrack Backend running on http://localhost:${PORT}`);
   console.log(`📋 API available at http://localhost:${PORT}/api`);
-  if (fs.existsSync(frontendBuildPath)) {
+  if (frontendBuildPath && fs.existsSync(frontendBuildPath)) {
     console.log(`🎨 Frontend Dashboard available at http://localhost:${PORT}`);
+  } else {
+    console.log(`⚠️  Frontend dashboard not available. Build frontend first.`);
   }
   console.log(`\n`);
 });
