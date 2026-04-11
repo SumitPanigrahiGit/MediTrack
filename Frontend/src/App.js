@@ -8,7 +8,6 @@ import LandingPage from './pages/LandingPage';
 import AuthPage from './pages/AuthPage';
 import PatientDashboard from './pages/PatientDashboard';
 import DoctorDashboard from './pages/DoctorDashboard';
-
 import FindDoctors from './pages/FindDoctors';
 import DoctorProfile from './pages/DoctorProfile';
 import SymptomChecker from './pages/SymptomChecker';
@@ -38,12 +37,10 @@ const ProtectedRoute = ({ children, roles }) => {
   return children;
 };
 
-axios.post('/api/auth/login', data)
 const DashboardRouter = () => {
   const { user } = useAuth();
   if (!user) return <Navigate to="/login" replace />;
   if (user.role === 'doctor') return <DoctorDashboard />;
-  
   return <PatientDashboard />;
 };
 
