@@ -1,5 +1,5 @@
 import axios from 'axios';
-
+axios.post('/api/auth/login', data)
 // ─── Configure API base URL ───────────────────────────────────────
 // This reads from environment variable for production, falls back to localhost for dev
 const BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
